@@ -1,0 +1,9 @@
+{
+  "name": "词光",
+  "id": "dev.wordatlas.client",
+  "version": "0.1.0",
+  "build": 1,
+  "appearance": "system",
+  "rust": "crates/atlas-ui",
+  "root": "App"
+}

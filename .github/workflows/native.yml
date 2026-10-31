@@ -1,0 +1,75 @@
+name: Native Rust client
+
+on:
+  pull_request:
+    paths: ["native/**", "data/**", "public/**", "scripts/*native*", "scripts/install-nsh.py", ".github/workflows/native.yml"]
+  push:
+    paths: ["native/**", "data/**", "public/**", "scripts/*native*", "scripts/install-nsh.py", ".github/workflows/native.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos
+            executable: output/tools/nsh/bin/nsh
+          - os: ubuntu-24.04
+            target: linux
+            executable: output/tools/nsh/bin/nsh
+          - os: windows-latest
+            target: windows
+            executable: output/tools/nsh/bin/nsh.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: GTK build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libssl-dev pkg-config fonts-noto-cjk
+      - name: Format
+        run: cargo fmt --manifest-path native/Cargo.toml --all -- --check
+      - name: Rust tests
+        run: cargo test --manifest-path native/Cargo.toml --workspace --locked
+      - name: Clippy
+        run: cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Complete offline assets
+        run: python scripts/check-native-assets.py
+      - name: Install pinned NSH
+        run: python scripts/install-nsh.py
+      - name: Package the native client
+        run: ${{ matrix.executable }} package native --target ${{ matrix.target }} --out output/native-${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: word-atlas-${{ matrix.target }}
+          path: output/native-${{ matrix.target }}/
+          retention-days: 7
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/install-nsh.py
+      - run: output/tools/nsh/bin/nsh package native --target ios-simulator --out output/native-ios
+      - run: python scripts/check-native-assets.py output/native-ios/词光.app --report output/native-ios/integrity.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: word-atlas-ios-simulator
+          path: output/native-ios/
+          retention-days: 7

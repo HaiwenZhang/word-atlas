@@ -9,3 +9,6 @@ output/
 .DS_Store
 .playwright-cli/
 *.tsbuildinfo
+native/target/
+native/.nsh/
+__pycache__/
